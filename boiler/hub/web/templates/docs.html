@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs · {{ project.name }} — Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · documentación</div>
+    <h1><a href="/">Hub</a> / <a href="/project/{{ project.id }}">{{ project.name }}</a> / docs</h1>
+  </div>
+  <div class="meta"><span class="muted small">{{ files|length }} archivos .md</span></div>
+</header>
+
+<div class="docs-layout">
+  <nav class="docs-nav">
+    {% set ns = namespace(last_dir=None) %}
+    {% for fl in files %}
+      {% if fl.dir != ns.last_dir %}
+        <div class="docs-dir">{{ fl.dir if fl.dir != '.' else '/' }}</div>
+        {% set ns.last_dir = fl.dir %}
+      {% endif %}
+      <a class="docs-file {% if doc and doc.path == fl.path %}active{% endif %}"
+         href="/project/{{ project.id }}/docs?f={{ fl.path|urlencode }}">{{ fl.name }}</a>
+    {% else %}
+      <div class="muted small">Este proyecto no tiene archivos .md</div>
+    {% endfor %}
+  </nav>
+
+  <article class="prose">
+    {% if doc %}
+      <div class="muted small doc-path">{{ doc.path }}</div>
+      {{ doc.html|safe }}
+    {% else %}
+      <p class="muted">Selecciona un documento.</p>
+    {% endif %}
+  </article>
+</div>
+
+<footer class="muted small"><a href="/project/{{ project.id }}">← volver al proyecto</a></footer>
+</body>
+</html>

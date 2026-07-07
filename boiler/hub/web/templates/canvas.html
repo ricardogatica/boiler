@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas · {{ project.name }} — Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · business model canvas</div>
+    <h1><a href="/">Hub</a> / <a href="/project/{{ project.id }}">{{ project.name }}</a> / canvas</h1>
+  </div>
+  <div class="meta">
+    <span class="muted small">{{ summary.filled_blocks }}/9 bloques · {{ summary.total_items }} ítems · canvas.yml versionado en el repo</span>
+  </div>
+</header>
+
+<div class="bmc">
+  {% for key, label in blocks %}
+  <section class="bmc-block bmc-{{ key }}">
+    <h3>{{ label }}</h3>
+    <ul>
+      {% for item in canvas[key] %}
+      <li>
+        <span>{{ item }}</span>
+        <form method="post" action="/project/{{ project.id }}/canvas/remove">
+          <input type="hidden" name="block" value="{{ key }}">
+          <input type="hidden" name="index" value="{{ loop.index0 }}">
+          <button type="submit" title="quitar" aria-label="quitar ítem">×</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/project/{{ project.id }}/canvas/add" class="bmc-add">
+      <input type="hidden" name="block" value="{{ key }}">
+      <input name="text" placeholder="Agregar…" aria-label="agregar a {{ label }}">
+    </form>
+  </section>
+  {% endfor %}
+</div>
+
+<footer class="muted small"><a href="/project/{{ project.id }}">← volver al proyecto</a> · los cambios se guardan en <code>canvas.yml</code> (commitéalo con el repo)</footer>
+</body>
+</html>

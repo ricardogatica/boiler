@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar — Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · vista macro técnica</div>
+    <h1><a href="/">Hub</a> / Radar</h1>
+  </div>
+  <div class="meta">
+    <span class="muted small">versiones · respaldos · puertos</span>
+  </div>
+</header>
+
+<h2>Versiones de frameworks <span class="muted">— referencia: lo más nuevo que ya usas en casa</span></h2>
+<div class="radar-fw">
+  {% for fw in versions.frameworks %}
+  <section class="fw-card">
+    <div class="fw-head">
+      <strong>{{ fw.framework }}</strong>
+      <span class="muted small">más nueva en casa: <code>{{ fw.newest }}</code>{% if fw.outdated_count %} · <span class="status serious"><span class="dot"></span>{{ fw.outdated_count }} atrasados</span>{% endif %}</span>
+    </div>
+    <div class="fw-entries">
+      {% for e in fw.entries %}
+      <a class="fw-chip {{ 'outdated' if e.outdated }}" href="/project/{{ e.project }}" title="{{ e.name }}{% if e.app != '.' %} · {{ e.app }}{% endif %}">
+        {{ e.name }} <code>{{ e.version }}</code>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+
+<h2>Respaldos <span class="muted">— proyectos con base de datos</span></h2>
+<table class="radar-table">
+  <thead><tr><th>Proyecto</th><th>Motor</th><th>Último respaldo</th><th>Estado</th></tr></thead>
+  <tbody>
+  {% for b in backups %}
+    <tr>
+      <td><a class="proj" href="/project/{{ b.id }}">{{ b.name }}</a></td>
+      <td><span class="chip">{{ b.engine }}</span></td>
+      <td>{% if b.last %}<code>{{ b.last }}</code>{% else %}<span class="muted small">—</span>{% endif %}</td>
+      <td><span class="status {{ b.state }}"><span class="dot"></span>{{ b.label }}</span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Mapa de puertos <span class="muted">— bloque de 10 por proyecto</span></h2>
+<div class="port-rail">
+  {% for b in ports %}
+  <a class="port-seg {{ 'overlap' if b.overlap }}" href="/project/{{ b.id }}" title="{{ b.name }} · bloque {{ b.port }}–{{ b.end }}">
+    <span class="port">{{ b.port }}</span>
+    <span class="small">{{ b.name }}</span>
+    {% if b.overlap %}<span class="status critical small"><span class="dot"></span>solape</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+
+<footer class="muted small"><a href="/">← dashboard</a></footer>
+</body>
+</html>

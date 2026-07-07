@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hub — Boiler</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · tablero de puertos</div>
+    <h1>Hub</h1>
+  </div>
+  <div class="meta">
+    <div class="gauges">
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.projects }}</div><div class="gauge-l">proyectos</div></div>
+      <div class="gauge"><div class="gauge-v"><span class="accent">{{ snap.totals.running }}</span></div><div class="gauge-l">corriendo</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.dirty }}</div><div class="gauge-l">sin commitear</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.open_tasks }}</div><div class="gauge-l">tareas abiertas</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.homolog_avg }}%</div><div class="gauge-l">homologación</div></div>
+      <a class="gauge" href="/security" style="text-decoration:none">
+        <div class="gauge-v {{ 'sev-critical' if snap.security.totals.critical else '' }}">{{ snap.security.totals.critical + snap.security.totals.high }}</div>
+        <div class="gauge-l">vulns crít+altas</div>
+      </a>
+    </div>
+    {% if not snap.docker_ok %}<span class="status critical"><span class="dot"></span>Docker apagado</span>{% endif %}
+    <a class="btn" href="/radar">Radar</a>
+    <a class="btn" href="/security">Seguridad</a>
+    <a class="btn" href="/kanban">Kanban</a>
+    <a class="btn" href="/?refresh=1" title="actualizado {{ snap.generated_at }}">Refrescar</a>
+  </div>
+</header>
+
+<section class="filters">
+  <input id="f-text" type="search" placeholder="Buscar proyecto…" aria-label="Buscar proyecto">
+  <select id="f-local" aria-label="Filtrar por estado local">
+    <option value="">Local: todos</option>
+    <option value="up">corriendo</option>
+    <option value="down">detenidos</option>
+  </select>
+  <select id="f-git" aria-label="Filtrar por git">
+    <option value="">Git: todos</option>
+    <option value="dirty">con cambios</option>
+    <option value="clean">limpios</option>
+    <option value="none">sin git</option>
+  </select>
+  {% set wss = snap.projects|map(attribute='workspace')|select|unique|list %}
+  {% if wss|length > 1 %}
+  <select id="f-ws" aria-label="Filtrar por workspace">
+    <option value="">Workspace: todos</option>
+    {% for w in wss|sort %}<option value="{{ w }}">{{ w }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <select id="f-empresa" aria-label="Filtrar por empresa">
+    <option value="">Empresa: todas</option>
+    {% for e in snap.projects|map(attribute='empresa')|unique|sort %}
+    <option value="{{ e }}">{{ e }}</option>
+    {% endfor %}
+  </select>
+  <span id="f-count" class="muted small"></span>
+</section>
+
+<div class="grid-wrap">
+<table id="grid">
+  <thead>
+    <tr>
+      <th data-key="port" data-dir="asc">Puerto</th>
+      <th data-key="name">Proyecto</th>
+      <th data-key="local">Local</th>
+      <th data-key="git">Git</th>
+      <th data-key="commit">Último commit</th>
+      <th data-key="tasks">Tareas</th>
+      <th data-key="homolog">Homologación</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for p in snap.projects|sort(attribute='port') %}
+    <tr data-name="{{ p.name|lower }} {{ p.id }}"
+        data-local="{{ 'up' if p.local.state in ('up','partial') else 'down' }}"
+        data-git="{{ 'dirty' if p.git.state in ('dirty','ahead') else 'clean' if p.git.state == 'clean' else 'none' }}"
+        data-empresa="{{ p.empresa }}"
+        data-ws="{{ p.workspace or '' }}"
+        data-sort-port="{{ p.port or 0 }}"
+        data-sort-name="{{ p.name|lower }}"
+        data-sort-local="{{ 2 if p.local.state == 'up' else 1 if p.local.state == 'partial' else 0 }}"
+        data-sort-git="{{ p.git.dirty or 0 }}"
+        data-sort-commit="{{ p.git.last_commit.ts if p.git.last_commit else 0 }}"
+        data-sort-tasks="{{ p.tasks.open }}"
+        data-sort-homolog="{{ p.homolog.score }}">
+      <td class="port-cell" title="bloque {{ p.port }}–{{ p.port + 9 }}">
+        <span class="port">{{ p.port }}</span>
+      </td>
+      <td class="proj-cell">
+        <a href="/project/{{ p.id }}" class="thumb-link" tabindex="-1">
+          {% if p.shot.exists %}
+          <img class="thumb" src="{{ p.shot.url }}" alt="" loading="lazy">
+          {% else %}
+          <span class="thumb thumb-empty" title="sin captura aún">·</span>
+          {% endif %}
+        </a>
+        <div>
+          <a class="proj" href="/project/{{ p.id }}">{{ p.name }}</a>
+          <div class="muted small">{% if p.workspace %}{{ p.workspace }}/{% endif %}{{ p.path }} · <a href="/project/{{ p.id }}/docs">docs</a></div>
+          <div class="chips">{% for s in p.stack[:4] %}<span class="chip">{{ s }}</span>{% endfor %}</div>
+        </div>
+      </td>
+      <td>
+        {% set ls = p.local.state %}
+        <span class="status {{ 'good' if ls == 'up' else 'warning' if ls == 'partial' else 'critical' if ls == 'missing' else 'off' }}">
+          <span class="dot"></span>{{ p.local.label }}
+        </span>
+        {% if p.local.containers %}<div class="muted small">{{ p.local.containers|length }} contenedores</div>{% endif %}
+        {% if ls == 'down' %}
+        <form method="post" action="/project/{{ p.id }}/run" class="runform">
+          <button class="btn-run" type="submit" title="./run.sh up">▶ Run</button>
+        </form>
+        {% elif ls in ('up', 'partial') %}
+        <div class="runrow">
+          {% if ls == 'up' %}<a class="small" href="{{ p.local_url }}" target="_blank">abrir ↗</a>{% endif %}
+          <form method="post" action="/project/{{ p.id }}/stop" class="runform">
+            <button class="btn-stop" type="submit" title="./run.sh down">■ Stop</button>
+          </form>
+        </div>
+        {% endif %}
+      </td>
+      <td>
+        {% set gs = p.git.state %}
+        <span class="status {{ 'good' if gs == 'clean' else 'warning' if gs in ('dirty','ahead') else 'off' }}">
+          <span class="dot"></span>{{ p.git.label }}
+        </span>
+        {% if p.git.is_repo %}
+          <div class="muted small">{{ p.git.branch }}{% if p.git.has_upstream %} · ↑{{ p.git.ahead }} ↓{{ p.git.behind }}{% endif %}</div>
+        {% endif %}
+      </td>
+      <td>
+        {% if p.git.last_commit %}
+          <div class="small">{{ p.git.last_commit.subject|truncate(56) }}</div>
+          <div class="muted small">
+            {% if p.git.commit_base %}<a href="{{ p.git.commit_base }}{{ p.git.last_commit.hash }}" target="_blank"><code>{{ p.git.last_commit.hash }}</code></a>{% else %}<code>{{ p.git.last_commit.hash }}</code>{% endif %}
+            · {{ p.git.last_commit.when }}
+          </div>
+        {% else %}<span class="muted small">—</span>{% endif %}
+      </td>
+      <td>
+        {% if p.tasks.total %}
+          <div class="small">{{ p.tasks.done }}/{{ p.tasks.total }} listas</div>
+          <div class="muted small">{% if p.tasks.by_status.doing %}{{ p.tasks.by_status.doing }} en curso{% endif %}{% if p.tasks.by_status.review %} · {{ p.tasks.by_status.review }} en revisión{% endif %}</div>
+        {% else %}<span class="muted small">—</span>{% endif %}
+      </td>
+      <td>
+        <div class="bar"><div class="bar-fill{% if p.homolog.score < 60 %} low{% endif %}" style="width: {{ p.homolog.score }}%"></div></div>
+        <div class="muted small">{{ p.homolog.passed }}/{{ p.homolog.total }} · {{ p.homolog.score }}%</div>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<footer class="muted small">Hub de Boiler v{{ boiler_version }} — git · docker · tareas · homologación, en local. API: <a href="/api/projects">/api/projects</a></footer>
+
+<script>
+// ── Filtros ──
+const rows = Array.from(document.querySelectorAll('#grid tbody tr'));
+const fText = document.getElementById('f-text');
+const fLocal = document.getElementById('f-local');
+const fGit = document.getElementById('f-git');
+const fEmp = document.getElementById('f-empresa');
+const fWs = document.getElementById('f-ws');
+const fCount = document.getElementById('f-count');
+
+function applyFilters() {
+  const q = fText.value.trim().toLowerCase();
+  let visible = 0;
+  rows.forEach(r => {
+    const ok = (!q || r.dataset.name.includes(q))
+      && (!fLocal.value || r.dataset.local === fLocal.value)
+      && (!fGit.value || r.dataset.git === fGit.value)
+      && (!fEmp.value || r.dataset.empresa === fEmp.value)
+      && (!fWs || !fWs.value || r.dataset.ws === fWs.value);
+    r.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+  fCount.textContent = visible === rows.length ? '' : `${visible} de ${rows.length}`;
+}
+[fText, fLocal, fGit, fEmp, fWs].filter(Boolean).forEach(el => el.addEventListener('input', applyFilters));
+
+// ── Orden por columna (clic; segundo clic invierte). Default: puerto asc ──
+let sortKey = 'port', sortDir = 1;
+document.querySelectorAll('#grid th[data-key]').forEach(th => {
+  th.classList.add('sortable');
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    sortDir = (sortKey === key) ? -sortDir : (['name', 'port'].includes(key) ? 1 : -1);
+    sortKey = key;
+    document.querySelectorAll('#grid th').forEach(h => h.removeAttribute('data-dir'));
+    th.setAttribute('data-dir', sortDir > 0 ? 'asc' : 'desc');
+    const tbody = document.querySelector('#grid tbody');
+    rows.sort((a, b) => {
+      const va = a.dataset['sort' + key[0].toUpperCase() + key.slice(1)];
+      const vb = b.dataset['sort' + key[0].toUpperCase() + key.slice(1)];
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) return (na - nb) * sortDir;
+      return va.localeCompare(vb) * sortDir;
+    }).forEach(r => tbody.appendChild(r));
+  });
+});
+</script>
+</body>
+</html>

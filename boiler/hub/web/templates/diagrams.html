@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagramas · {{ project.name }} — Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · diagramas y flujos (mermaid)</div>
+    <h1><a href="/">Hub</a> / <a href="/project/{{ project.id }}">{{ project.name }}</a> / diagramas</h1>
+  </div>
+  <div class="meta">
+    <span class="muted small">{{ diagrams|length }} diagramas</span>
+    {% if exported is not none %}<span class="status good"><span class="dot"></span>{{ exported.ok }} PNG exportados{% if exported.errors %} · {{ exported.errors }} con error{% endif %}</span>{% endif %}
+    <form method="post" action="/project/{{ project.id }}/diagrams/export">
+      <input type="hidden" name="path" value="__all__">
+      <button class="btn" type="submit">Exportar todos a PNG</button>
+    </form>
+  </div>
+</header>
+
+{% if not diagrams %}
+<p class="muted">Este proyecto no tiene diagramas mermaid (.mmd o bloques ```mermaid en .docs/).</p>
+{% endif %}
+
+<div class="dgm-grid">
+  {% for d in diagrams %}
+  <section class="dgm">
+    <div class="dgm-head">
+      <div>
+        <strong>{{ d.name }}</strong>
+        <div class="muted small">{{ d.path }}{% if d.kind == 'embed' %} · embebido en .md{% endif %}</div>
+      </div>
+      <div class="dgm-actions">
+        {% if d.png %}<a class="btn" href="/project/{{ project.id }}/diagrams/png?f={{ d.png|urlencode }}" target="_blank">ver PNG</a>{% endif %}
+        {% if d.kind == 'file' %}
+        <form method="post" action="/project/{{ project.id }}/diagrams/export">
+          <input type="hidden" name="path" value="{{ d.path }}">
+          <button class="btn" type="submit">{{ 'Re-exportar' if d.png else 'Exportar PNG' }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    <pre class="mermaid">{{ d.code }}</pre>
+  </section>
+  {% endfor %}
+</div>
+
+<footer class="muted small"><a href="/project/{{ project.id }}">← volver al proyecto</a> · los PNG se guardan junto al fuente (convención: mermaid/ → png/)</footer>
+
+<script src="/static/vendor/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'neutral',
+  securityLevel: 'loose',
+});
+</script>
+</body>
+</html>

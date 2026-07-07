@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanban — Hub reSTART</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · tareas</div>
+    <h1><a href="/">Hub</a> / Kanban <span class="muted small">({{ total }} tareas)</span></h1>
+  </div>
+  <div class="meta">
+    <form method="post" id="newtask-kanban" class="newtask" style="margin:0">
+      <select name="_project" id="nt-project" aria-label="proyecto de la nueva tarea">
+        {% for pr in project_list %}
+        <option value="{{ pr.id }}" {% if filter_project == pr.id %}selected{% endif %}>{{ pr.name }}</option>
+        {% endfor %}
+      </select>
+      <input name="title" placeholder="Nueva tarea…" required aria-label="título de la nueva tarea">
+      <input type="hidden" name="back" value="/kanban{% if filter_project %}?project={{ filter_project }}{% endif %}">
+      <button class="btn" type="submit">＋ Agregar</button>
+    </form>
+    <form method="get" action="/kanban">
+      <select name="project" onchange="this.form.submit()">
+        <option value="">Todos los proyectos</option>
+        {% for pr in project_list %}
+        <option value="{{ pr.id }}" {% if filter_project == pr.id %}selected{% endif %}>{{ pr.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+</header>
+
+<div class="board">
+  {% for col in columns %}
+  <div class="col" data-status="{{ col.status }}">
+    <div class="col-head">{{ col.title }} <span class="muted">{{ col.tasks|length }}</span></div>
+    <div class="col-body" data-status="{{ col.status }}">
+      {% for t in col.tasks %}
+      <div class="card" draggable="true" data-task="{{ t.id }}" data-project="{{ t.project_id }}">
+        <div class="card-top">
+          <code>{{ t.id }}</code>
+          <a class="chip" href="/project/{{ t.project_id }}">{{ t.project_name }}</a>
+        </div>
+        <div class="card-title">{{ t.title }}</div>
+        {% if t.notes %}<div class="muted small">{{ t.notes|truncate(80) }}</div>{% endif %}
+        <div class="card-foot">
+          {% set it = t.integration %}
+          <span class="status {{ 'good' if it == 'committed' else 'warning' if it == 'wip' else 'off' }} small">
+            <span class="dot"></span>{{ t.integration_label }}
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<footer class="muted small"><a href="/">← dashboard</a> · arrastra una tarjeta a otra columna para cambiar su estado (escribe en el tasks.yml del proyecto)</footer>
+
+<script>
+// Alta de tareas desde el kanban: la acción del form depende del proyecto elegido
+const ntForm = document.getElementById('newtask-kanban');
+const ntProject = document.getElementById('nt-project');
+function setNtAction() { ntForm.action = `/project/${ntProject.value}/tasks`; }
+ntProject.addEventListener('change', setNtAction);
+setNtAction();
+
+let dragged = null;
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('dragstart', () => { dragged = card; card.classList.add('dragging'); });
+  card.addEventListener('dragend', () => { card.classList.remove('dragging'); });
+});
+document.querySelectorAll('.col-body').forEach(col => {
+  col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over'); });
+  col.addEventListener('dragleave', () => col.classList.remove('over'));
+  col.addEventListener('drop', async e => {
+    e.preventDefault();
+    col.classList.remove('over');
+    if (!dragged) return;
+    const status = col.dataset.status;
+    const body = new FormData();
+    body.append('status', status);
+    await fetch(`/project/${dragged.dataset.project}/tasks/${dragged.dataset.task}/status`,
+                { method: 'POST', body });
+    location.reload();
+  });
+});
+</script>
+</body>
+</html>

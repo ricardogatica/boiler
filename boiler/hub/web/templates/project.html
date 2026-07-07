@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ p.name }} — Hub reSTART</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · proyecto</div>
+    <h1><a href="/">Hub</a> / {{ p.name }}</h1>
+  </div>
+  <div class="meta">
+    <a class="btn" href="/project/{{ p.id }}/diagrams">◇ Diagramas</a>
+    <a class="btn" href="/project/{{ p.id }}/canvas">🗺 Canvas</a>
+    <a class="btn" href="/project/{{ p.id }}/docs">📄 Docs</a>
+    <a class="btn" href="{{ p.local_url }}" target="_blank">{{ p.local_url }}</a>
+  </div>
+</header>
+
+<section class="tiles">
+  <div class="tile">
+    {% set ls = p.local.state %}
+    <span class="status {{ 'good' if ls == 'up' else 'warning' if ls == 'partial' else 'off' }}"><span class="dot"></span>{{ p.local.label }}</span>
+    <div class="tile-label">estado local</div>
+    {% if ls == 'down' %}
+    <form method="post" action="/project/{{ p.id }}/run" class="runform">
+      <button class="btn btn-run" type="submit" title="./run.sh up">▶ RUN</button>
+    </form>
+    {% else %}
+    <form method="post" action="/project/{{ p.id }}/stop" class="runform">
+      <button class="btn btn-stop" type="submit" title="./run.sh down">■ STOP</button>
+    </form>
+    {% endif %}
+    <div class="small" style="margin-top:6px"><a href="/project/{{ p.id }}/runlog">ver log de arranque</a></div>
+  </div>
+  <div class="tile">
+    {% set gs = p.git.state %}
+    <span class="status {{ 'good' if gs == 'clean' else 'warning' if gs in ('dirty','ahead') else 'off' }}"><span class="dot"></span>{{ p.git.label }}</span>
+    <div class="tile-label">git · {{ p.git.branch }}</div>
+  </div>
+  <div class="tile"><div class="tile-value">{{ p.homolog.score }}%</div><div class="tile-label">homologación</div></div>
+</section>
+
+<section class="shot-box">
+  {% if p.shot.exists %}
+  <a href="{{ p.shot.url }}" target="_blank"><img class="shot" src="{{ p.shot.url }}" alt="captura de {{ p.name }}"></a>
+  <div class="meta">
+    <span class="muted small">captura del {{ p.shot.taken }}</span>
+    <form method="post" action="/project/{{ p.id }}/capture"><button class="btn" type="submit">📸 Capturar de nuevo</button></form>
+  </div>
+  {% else %}
+  <div class="meta">
+    <span class="muted small">Sin captura aún — se toma sola al levantar con RUN, o manualmente:</span>
+    <form method="post" action="/project/{{ p.id }}/capture"><button class="btn" type="submit">📸 Capturar ahora</button></form>
+  </div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Tareas ({{ p.tasks.done }}/{{ p.tasks.total }} listas) · <a href="/kanban?project={{ p.id }}">ver en kanban</a></h2>
+  <table class="tasks">
+    <thead><tr><th>ID</th><th>Tarea</th><th>Estado</th><th>Integración en el código</th></tr></thead>
+    <tbody>
+    {% for t in p.tasks.tasks %}
+      <tr>
+        <td><code>{{ t.id }}</code></td>
+        <td>
+          {{ t.title }}
+          {% if t.notes %}<div class="muted small">{{ t.notes }}</div>{% endif %}
+        </td>
+        <td>
+          <form method="post" action="/project/{{ p.id }}/tasks/{{ t.id }}/status">
+            <select name="status" onchange="this.form.submit()">
+              {% for s in ['todo','doing','review','done'] %}
+              <option value="{{ s }}" {% if t.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td>
+          {% set it = t.integration %}
+          <span class="status {{ 'good' if it == 'committed' else 'warning' if it == 'wip' else 'off' }}">
+            <span class="dot"></span>{{ t.integration_label }}
+          </span>
+          {% for c in t.commits[:3] %}
+          <div class="muted small">
+            {% if p.git.commit_base %}<a href="{{ p.git.commit_base }}{{ c.hash }}" target="_blank"><code>{{ c.hash }}</code></a>{% else %}<code>{{ c.hash }}</code>{% endif %}
+            {{ c.subject|truncate(48) }} · {{ c.when }}
+          </div>
+          {% endfor %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">Sin tareas aún — crea la primera abajo. Menciona el ID en tus commits para que el hub detecte la integración.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" action="/project/{{ p.id }}/tasks" class="newtask">
+    <input name="title" placeholder="Nueva tarea…" required>
+    <input name="notes" placeholder="Notas (opcional)">
+    <button class="btn" type="submit">Agregar</button>
+  </form>
+</section>
+
+<div class="cols">
+  <section>
+    <h2>Checklist de homologación</h2>
+    <ul class="checklist">
+      {% for key, c in p.homolog.checks.items() %}
+      <li><span class="status {{ 'good' if c.ok else 'serious' }}"><span class="dot"></span>{{ c.label }}</span></li>
+      {% endfor %}
+    </ul>
+
+    {% if p.local.containers %}
+    <h2>Contenedores</h2>
+    <ul class="checklist">
+      {% for c in p.local.containers %}
+      <li><span class="status good"><span class="dot"></span>{{ c.name }}</span> <span class="muted small">{{ c.status }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if p.git.dirty %}
+    <h2>Sin commitear ({{ p.git.dirty }})</h2>
+    <pre>{% for f in p.git.dirty_files %}{{ f }}
+{% endfor %}</pre>
+    {% if p.diff_stat %}<h2>Diff</h2><pre>{{ p.diff_stat }}</pre>{% endif %}
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Últimos commits</h2>
+    <ul class="log">
+      {% for c in p.log %}
+      <li>
+        {% if p.git.commit_base %}<a href="{{ p.git.commit_base }}{{ c.hash }}" target="_blank"><code>{{ c.hash }}</code></a>{% else %}<code>{{ c.hash }}</code>{% endif %}
+        {{ c.subject|truncate(70) }} <span class="muted small">— {{ c.author }}, {{ c.when }}</span>
+      </li>
+      {% else %}
+      <li class="muted">sin historial (¿no es repo git?)</li>
+      {% endfor %}
+    </ul>
+    {% if p.git.remote %}<p class="muted small">remoto: {{ p.git.remote }}</p>{% endif %}
+  </section>
+</div>
+
+<footer class="muted small"><a href="/">← volver al dashboard</a> · <a href="/api/projects/{{ p.id }}">JSON</a></footer>
+</body>
+</html>

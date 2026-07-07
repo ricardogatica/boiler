@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguridad — Hub</title>
+<link rel="stylesheet" href="/static/style.css">
+{% if scanning %}<meta http-equiv="refresh" content="10">{% endif %}
+</head>
+<body class="wide">
+<header>
+  <div class="brand">
+    <div class="eyebrow">Boiler · vulnerabilidades de dependencias (OSV.dev · GitHub Advisories)</div>
+    <h1><a href="/">Hub</a> / Seguridad</h1>
+  </div>
+  <div class="meta">
+    <div class="gauges">
+      <div class="gauge"><div class="gauge-v sev-critical">{{ snap.totals.critical }}</div><div class="gauge-l">críticas</div></div>
+      <div class="gauge"><div class="gauge-v sev-high">{{ snap.totals.high }}</div><div class="gauge-l">altas</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.moderate }}</div><div class="gauge-l">moderadas</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.totals.low + snap.totals.unknown }}</div><div class="gauge-l">bajas/otras</div></div>
+      <div class="gauge"><div class="gauge-v">{{ snap.deps_total }}</div><div class="gauge-l">dependencias</div></div>
+    </div>
+    {% if scanning %}
+      <span class="status warning"><span class="dot"></span>escaneando… (se refresca solo)</span>
+    {% else %}
+      <span class="muted small">{% if snap.scanned_at %}último escaneo {{ snap.scanned_at }}{% else %}sin escaneos aún{% endif %}</span>
+      <a class="btn" href="/security/report.md?download=1">⬇ Informe completo .md</a>
+      <form method="post" action="/security/scan"><button class="btn" type="submit">Escanear ahora</button></form>
+    {% endif %}
+  </div>
+</header>
+
+<section class="filters">
+  <input id="sf-text" type="search" placeholder="Buscar proyecto…" aria-label="Buscar proyecto">
+  <select id="sf-sev" aria-label="Filtrar por severidad">
+    <option value="">Severidad: todas</option>
+    <option value="crit">con críticas</option>
+    <option value="high">con altas</option>
+    <option value="mod">solo moderadas/bajas</option>
+  </select>
+  <button class="btn" id="sf-toggle" type="button">Colapsar todo</button>
+  <span id="sf-count" class="muted small"></span>
+</section>
+
+{% for r in rows %}
+<details class="sec-project" data-name="{{ r.name|lower }} {{ r.id }}"
+         data-crit="{{ r.counts.critical }}" data-high="{{ r.counts.high }}"
+         {% if r.counts.critical or r.counts.high %}open{% endif %}>
+  <summary>
+    <span class="proj">{{ r.name }}</span>
+    <span class="sec-chips">
+      {% if r.counts.critical %}<span class="status critical"><span class="dot"></span>{{ r.counts.critical }} críticas</span>{% endif %}
+      {% if r.counts.high %}<span class="status serious"><span class="dot"></span>{{ r.counts.high }} altas</span>{% endif %}
+      {% if r.counts.moderate %}<span class="status warning"><span class="dot"></span>{{ r.counts.moderate }} moderadas</span>{% endif %}
+      {% if r.counts.low + r.counts.unknown %}<span class="status off"><span class="dot"></span>{{ r.counts.low + r.counts.unknown }} bajas/otras</span>{% endif %}
+    </span>
+    <span class="sec-actions">
+      <button class="btn btn-copy" type="button" data-md="/security/{{ r.id }}.md">📋 Copiar MD</button>
+      <a class="btn" href="/security/{{ r.id }}.md?download=1">⬇ .md</a>
+    </span>
+  </summary>
+  <table class="sec-table">
+    <thead><tr><th>Severidad</th><th>Paquete</th><th>Advisory</th><th>Corrige en</th><th>Detalle</th></tr></thead>
+    <tbody>
+    {% for i in r.vulns %}
+      <tr>
+        <td><span class="status {{ 'critical' if i.severity == 'critical' else 'serious' if i.severity == 'high' else 'warning' if i.severity == 'moderate' else 'off' }}"><span class="dot"></span>{{ i.severity }}</span></td>
+        <td>
+          <code>{{ i.package }}@{{ i.version }}</code>
+          <div class="muted small">{{ i.ecosystem }}{% if i.app != '.' %} · {{ i.app }}{% endif %}</div>
+        </td>
+        <td>
+          <a href="{{ i.url }}" target="_blank"><code>{{ i.vuln_id }}</code></a>
+          {% if i.cve %}<div class="muted small"><a href="https://nvd.nist.gov/vuln/detail/{{ i.cve }}" target="_blank">{{ i.cve }}</a></div>{% endif %}
+        </td>
+        <td>{% if i.fixed %}<code>{{ i.fixed }}</code>{% else %}<span class="muted small">—</span>{% endif %}</td>
+        <td class="small">{{ i.summary|truncate(110) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endfor %}
+
+{% if snap.scanned_at and clean %}
+<h2>Sin vulnerabilidades conocidas</h2>
+<p class="muted small">{% for p in clean %}{{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% endif %}
+{% if not snap.scanned_at and not scanning %}
+<p class="muted">Aún no hay escaneos. Pulsa <strong>Escanear ahora</strong> — el servicio además escanea solo cada 24 h.</p>
+{% endif %}
+
+<footer class="muted small"><a href="/">← dashboard</a> · fuente: <a href="https://osv.dev" target="_blank">OSV.dev</a> (GitHub Advisories, npm, Packagist, PyPI) · snapshot en ~/.boiler/security.json</footer>
+
+<script>
+// ── Filtros + colapsar ──
+const cards = Array.from(document.querySelectorAll('.sec-project'));
+const sfText = document.getElementById('sf-text');
+const sfSev = document.getElementById('sf-sev');
+const sfCount = document.getElementById('sf-count');
+const sfToggle = document.getElementById('sf-toggle');
+
+function applySecFilters() {
+  const q = sfText.value.trim().toLowerCase();
+  let visible = 0;
+  cards.forEach(c => {
+    const crit = +c.dataset.crit, high = +c.dataset.high;
+    const sevOk = !sfSev.value
+      || (sfSev.value === 'crit' && crit > 0)
+      || (sfSev.value === 'high' && high > 0)
+      || (sfSev.value === 'mod' && crit === 0 && high === 0);
+    const ok = (!q || c.dataset.name.includes(q)) && sevOk;
+    c.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+  sfCount.textContent = visible === cards.length ? '' : `${visible} de ${cards.length}`;
+}
+[sfText, sfSev].forEach(el => el.addEventListener('input', applySecFilters));
+
+sfToggle.addEventListener('click', () => {
+  const anyOpen = cards.some(c => c.open && c.style.display !== 'none');
+  cards.forEach(c => { c.open = !anyOpen; });
+  sfToggle.textContent = anyOpen ? 'Expandir todo' : 'Colapsar todo';
+});
+
+// Copiar el informe .md de un proyecto al portapapeles
+document.querySelectorAll('.btn-copy').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const res = await fetch(btn.dataset.md);
+      await navigator.clipboard.writeText(await res.text());
+      const prev = btn.textContent;
+      btn.textContent = '✓ Copiado';
+      setTimeout(() => { btn.textContent = prev; }, 1600);
+    } catch (err) {
+      btn.textContent = '✗ Error';
+    }
+  });
+});
+// Evitar que los botones dentro de <summary> abran/cierren el details
+document.querySelectorAll('.sec-actions .btn').forEach(el =>
+  el.addEventListener('click', e => e.stopPropagation()));
+</script>
+</body>
+</html>

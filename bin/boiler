@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Launcher global de Boiler — resuelve el venv del repo Boiler y ejecuta la CLI.
+set -euo pipefail
+BOILER_DIR="$(cd "$(dirname "$(readlink "${BASH_SOURCE[0]}" || echo "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec env PYTHONPATH="$BOILER_DIR" "$BOILER_DIR/.venv/bin/python" -m boiler.cli "$@"

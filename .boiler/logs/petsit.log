@@ -1,0 +1,58 @@
+→ Esperando a mc-mysql ✓
+→ Levantando stack petsit …
+time="2026-07-07T11:14:40-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+time="2026-07-07T11:14:40-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+time="2026-07-07T11:14:40-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+ Network petsit_default Creating 
+ Network petsit_default Created 
+ Container petsit-redis Creating 
+ Container petsit-vite Creating 
+ Container petsit-redis Created 
+ Container petsit-reverb Creating 
+ Container petsit-app Creating 
+ Container petsit-queue Creating 
+ Container petsit-scheduler Creating 
+ Container petsit-vite Created 
+ Container petsit-app Created 
+ Container petsit-nginx Creating 
+ Container petsit-reverb Created 
+ Container petsit-scheduler Created 
+ Container petsit-queue Created 
+ Container petsit-nginx Created 
+ Container petsit-redis Starting 
+ Container petsit-vite Starting 
+ Container petsit-redis Started 
+ Container petsit-redis Waiting 
+ Container petsit-redis Waiting 
+ Container petsit-redis Waiting 
+ Container petsit-redis Waiting 
+ Container petsit-vite Started 
+ Container petsit-redis Healthy 
+ Container petsit-redis Healthy 
+ Container petsit-queue Starting 
+ Container petsit-redis Healthy 
+ Container petsit-scheduler Starting 
+ Container petsit-redis Healthy 
+ Container petsit-reverb Starting 
+ Container petsit-app Starting 
+ Container petsit-queue Started 
+ Container petsit-scheduler Started 
+ Container petsit-reverb Started 
+ Container petsit-app Started 
+ Container petsit-nginx Starting 
+ Container petsit-nginx Started 
+→ Esperando a que composer install termine (primera vez puede tardar)…
+→ Aplicando migraciones…
+time="2026-07-07T11:14:48-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+time="2026-07-07T11:14:48-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+time="2026-07-07T11:14:48-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+time="2026-07-07T11:14:48-04:00" level=warning msg="The \"MAILERSEND_API_KEY\" variable is not set. Defaulting to a blank string."
+
+   INFO  Nothing to migrate.  
+
+
+   App      → http://petsit.localhost:8010
+   Vite     → localhost:8015 · Reverb (ws) → localhost:8016 · Redis → localhost:8014
+   MySQL    → mc-mysql (Minicatalogo), base thepets — host: localhost:33063
+
+   Logs:  ./run.sh logs   ·   Parar:  ./run.sh down
