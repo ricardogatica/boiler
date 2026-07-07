@@ -56,6 +56,7 @@
       {% if r.counts.low + r.counts.unknown %}<span class="status off"><span class="dot"></span>{{ r.counts.low + r.counts.unknown }} bajas/otras</span>{% endif %}
     </span>
     <span class="sec-actions">
+      <form method="post" action="/security/scan/{{ r.id }}"><button class="btn" type="submit" title="re-escanear solo este proyecto">↻ Re-escanear</button></form>
       <button class="btn btn-copy" type="button" data-md="/security/{{ r.id }}.md">📋 Copiar MD</button>
       <a class="btn" href="/security/{{ r.id }}.md?download=1">⬇ .md</a>
     </span>
@@ -85,7 +86,7 @@
 
 {% if snap.scanned_at and clean %}
 <h2>Sin vulnerabilidades conocidas</h2>
-<p class="muted small">{% for p in clean %}{{ p.name }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+<p class="muted small">{% for p in clean %}<span class="clean-item">{{ p.name }}<form method="post" action="/security/scan/{{ p.id }}" style="display:inline"><button class="btn-mini" type="submit" title="re-escanear {{ p.name }}">↻</button></form></span>{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% endif %}
 {% if not snap.scanned_at and not scanning %}
 <p class="muted">Aún no hay escaneos. Pulsa <strong>Escanear ahora</strong> — el servicio además escanea solo cada 24 h.</p>

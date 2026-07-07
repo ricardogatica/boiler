@@ -417,3 +417,8 @@ code { background: var(--panel-2); border-radius: 4px; padding: 0 4px; font-size
 .port-seg:hover { text-decoration: none; border-color: var(--ink-2); }
 .port-seg .port { padding-left: 0; font-size: 15px; }
 .port-seg.overlap { border-left-color: var(--critical); }
+.btn-mini {
+  background: none; border: 0; color: var(--accent); cursor: pointer;
+  font-size: 12px; padding: 0 3px;
+}
+.clean-item { white-space: nowrap; }

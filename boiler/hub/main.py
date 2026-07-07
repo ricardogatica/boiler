@@ -324,6 +324,16 @@ def security_scan():
     return RedirectResponse("/security", status_code=303)
 
 
+@app.post("/security/scan/{project_id}")
+def security_scan_project(project_id: str):
+    try:
+        p = registry.get_project(project_id)
+    except KeyError:
+        raise HTTPException(404)
+    security.scan_project_in_thread(p)
+    return RedirectResponse("/security", status_code=303)
+
+
 @app.get("/security/report.md")
 def security_report_md(download: bool = False):
     from fastapi.responses import PlainTextResponse

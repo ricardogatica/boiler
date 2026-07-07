@@ -289,6 +289,88 @@ def _scan(projects: List[Dict]) -> Dict:
     return snap
 
 
+def scan_project(project: Dict) -> Dict:
+    """Re-escanea UN proyecto y fusiona el resultado en el snapshot global."""
+    with _LOCK:
+        if _STATE["scanning"]:
+            return load_snapshot()
+        _STATE["scanning"] = True
+    try:
+        snap = load_snapshot()
+        cache: Dict[str, Dict] = snap.get("vuln_cache") or {}
+        deps = inventory(project)
+
+        unique: Dict[Tuple[str, str, str], List[str]] = {}
+        for d in deps:
+            unique.setdefault((d["ecosystem"], d["name"], d["version"]), []).append(d["app"])
+
+        keys = list(unique.keys())
+        hits: Dict[Tuple[str, str, str], List[str]] = {}
+        for i in range(0, len(keys), 950):
+            chunk = keys[i:i + 950]
+            try:
+                res = _post_json(OSV_BATCH, {"queries": [
+                    {"package": {"ecosystem": e, "name": n}, "version": v} for e, n, v in chunk]})
+            except Exception:
+                continue
+            for key, r in zip(chunk, res.get("results", [])):
+                ids = [v["id"] for v in (r or {}).get("vulns") or []]
+                if ids:
+                    hits[key] = ids
+
+        todo = sorted({vid for ids in hits.values() for vid in ids if vid not in cache})
+
+        def fetch(vid: str):
+            try:
+                v = _get_json(OSV_VULN % vid)
+                cache[vid] = {"id": vid, "summary": v.get("summary") or (v.get("details") or "")[:140],
+                              "aliases": v.get("aliases") or [], "severity": _severity_of(v),
+                              "affected": v.get("affected") or []}
+            except Exception:
+                cache[vid] = {"id": vid, "summary": "", "aliases": [], "severity": "unknown", "affected": []}
+
+        if todo:
+            with ThreadPoolExecutor(max_workers=12) as pool:
+                list(pool.map(fetch, todo))
+
+        entry = {"counts": {sv: 0 for sv in SEV_ORDER}, "items": [],
+                 "scanned_at": time.strftime("%Y-%m-%d %H:%M")}
+        for key, vids in hits.items():
+            eco, name, ver = key
+            for app in unique[key]:
+                for vid in vids:
+                    meta = cache.get(vid) or {}
+                    sev = meta.get("severity", "unknown")
+                    entry["counts"][sev] += 1
+                    entry["items"].append({
+                        "package": name, "version": ver, "ecosystem": eco, "app": app,
+                        "vuln_id": vid, "severity": sev,
+                        "summary": meta.get("summary", ""),
+                        "url": _advisory_url(vid, meta.get("aliases", [])),
+                        "cve": next((a for a in meta.get("aliases", []) if a.startswith("CVE-")), None),
+                        "fixed": _fixed_version({"affected": meta.get("affected", [])}, eco, name, ver),
+                    })
+        entry["items"].sort(key=lambda i: SEV_ORDER.index(i["severity"]))
+
+        pid = project["id"]
+        if entry["items"]:
+            snap.setdefault("projects", {})[pid] = entry
+        else:
+            snap.get("projects", {}).pop(pid, None)
+        snap["totals"] = {sv: sum(e["counts"][sv] for e in snap["projects"].values())
+                          for sv in SEV_ORDER}
+        snap["vuln_cache"] = cache
+        SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+        SNAPSHOT.write_text(json.dumps(snap, ensure_ascii=False))
+        return snap
+    finally:
+        _STATE["scanning"] = False
+
+
+def scan_project_in_thread(project: Dict) -> None:
+    threading.Thread(target=scan_project, args=(project,), daemon=True).start()
+
+
 def load_snapshot() -> Dict:
     if SNAPSHOT.is_file():
         try:
